@@ -630,6 +630,9 @@ class TodoApp {
 
     // Eliminar tarea y subtareas recursivamente
     async deleteTaskAndSubtasks(taskId) {
+        // Guardar info de la tarea antes de eliminarla (para notificaciones)
+        const taskToDelete = this.tasks.find(task => task.id === taskId);
+        
         // Encontrar y eliminar todas las subtareas
         const subtasks = this.tasks.filter(task => task.parentId === taskId);
         for (const subtask of subtasks) {
@@ -644,6 +647,14 @@ class TodoApp {
             } catch (error) {
                 console.error('Error al eliminar de Firebase:', error);
             }
+        }
+        
+        // Enviar notificaciones solo para la tarea principal (no subtareas)
+        if (taskToDelete && !taskToDelete.parentId && this.notificationManager) {
+            await this.notificationManager.notifyTaskDeleted(
+                taskToDelete,
+                this.currentUser
+            );
         }
         
         // Eliminar del array local

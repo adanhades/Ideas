@@ -120,24 +120,27 @@ export class NotificationManager {
     // Notificar cuando se crea una nueva tarea
     async notifyTaskCreated(task, createdBy, assignedTo) {
         const promises = [];
+        const creatorName = createdBy === 'hades' ? 'Hades' : 'Reiger';
 
-        // Si la tarea está asignada a alguien diferente al creador
-        if (assignedTo && assignedTo !== createdBy) {
-            const assignedUserEmail = USER_EMAILS[assignedTo];
-            const assignedUserName = assignedTo === 'hades' ? 'Hades' : 'Reiger';
-            const creatorName = createdBy === 'hades' ? 'Hades' : 'Reiger';
+        // Notificar a AMBOS usuarios (excepto al que creó la tarea)
+        const usersToNotify = ['hades', 'reiger'].filter(user => user !== createdBy);
+
+        for (const userId of usersToNotify) {
+            const userEmail = USER_EMAILS[userId];
+            const userName = userId === 'hades' ? 'Hades' : 'Reiger';
 
             // Email notification
             if (NOTIFICATION_SETTINGS.emailEvents.taskCreated) {
                 const emailParams = {
-                    to_email: assignedUserEmail,
-                    to_name: assignedUserName,
+                    to_email: userEmail,
+                    to_name: userName,
                     from_name: creatorName,
                     task_title: task.title,
                     task_description: task.description || 'Sin descripción',
                     task_type: task.type || 'Sin tipo',
                     task_priority: task.priority || 'media',
                     task_date: task.dueDate ? new Date(task.dueDate).toLocaleDateString('es-ES') : 'Sin fecha',
+                    task_action: 'creó',
                     app_url: 'https://todo-app-9b0b6.web.app'
                 };
 
@@ -145,21 +148,21 @@ export class NotificationManager {
                     this.sendEmail(EMAILJS_CONFIG.templates.newTask, emailParams)
                 );
             }
+        }
 
-            // Push notification
-            if (NOTIFICATION_SETTINGS.pushEvents.taskCreated) {
-                promises.push(
-                    this.showPushNotification(
-                        '📋 Nueva tarea asignada',
-                        {
-                            body: `${creatorName} te asignó: "${task.title}"`,
-                            tag: `task-${task.id}`,
-                            requireInteraction: false,
-                            vibrate: [200, 100, 200]
-                        }
-                    )
-                );
-            }
+        // Push notification (solo para el usuario actual en el navegador)
+        if (NOTIFICATION_SETTINGS.pushEvents.taskCreated) {
+            promises.push(
+                this.showPushNotification(
+                    '📋 Nueva tarea creada',
+                    {
+                        body: `${creatorName} creó: "${task.title}"`,
+                        tag: `task-${task.id}`,
+                        requireInteraction: false,
+                        vibrate: [200, 100, 200]
+                    }
+                )
+            );
         }
 
         const results = await Promise.allSettled(promises);
@@ -168,14 +171,39 @@ export class NotificationManager {
 
     // Notificar cuando se actualiza una tarea
     async notifyTaskUpdated(task, updatedBy, assignedTo) {
-        if (!assignedTo || assignedTo === updatedBy) return;
-
         const promises = [];
+        const updaterName = updatedBy === 'hades' ? 'Hades' : 'Reiger';
 
-        // Push notification (emails deshabilitados por defecto para actualizaciones)
+        // Notificar a AMBOS usuarios (excepto al que actualizó)
+        const usersToNotify = ['hades', 'reiger'].filter(user => user !== updatedBy);
+
+        for (const userId of usersToNotify) {
+            const userEmail = USER_EMAILS[userId];
+            const userName = userId === 'hades' ? 'Hades' : 'Reiger';
+
+            // Email notification
+            if (NOTIFICATION_SETTINGS.emailEvents.taskUpdated) {
+                const emailParams = {
+                    to_email: userEmail,
+                    to_name: userName,
+                    from_name: updaterName,
+                    task_title: task.title,
+                    task_description: task.description || 'Sin descripción',
+                    task_type: task.type || 'Sin tipo',
+                    task_priority: task.priority || 'media',
+                    task_date: task.dueDate ? new Date(task.dueDate).toLocaleDateString('es-ES') : 'Sin fecha',
+                    task_action: 'actualizó',
+                    app_url: 'https://todo-app-9b0b6.web.app'
+                };
+
+                promises.push(
+                    this.sendEmail(EMAILJS_CONFIG.templates.newTask, emailParams)
+                );
+            }
+        }
+
+        // Push notification
         if (NOTIFICATION_SETTINGS.pushEvents.taskUpdated) {
-            const updaterName = updatedBy === 'hades' ? 'Hades' : 'Reiger';
-            
             promises.push(
                 this.showPushNotification(
                     '✏️ Tarea actualizada',
@@ -194,18 +222,95 @@ export class NotificationManager {
 
     // Notificar cuando se completa una tarea
     async notifyTaskCompleted(task, completedBy, assignedTo) {
-        if (!assignedTo || assignedTo === completedBy) return;
-
         const promises = [];
+        const completerName = completedBy === 'hades' ? 'Hades' : 'Reiger';
 
+        // Notificar a AMBOS usuarios (excepto al que completó)
+        const usersToNotify = ['hades', 'reiger'].filter(user => user !== completedBy);
+
+        for (const userId of usersToNotify) {
+            const userEmail = USER_EMAILS[userId];
+            const userName = userId === 'hades' ? 'Hades' : 'Reiger';
+
+            // Email notification
+            if (NOTIFICATION_SETTINGS.emailEvents.taskCompleted) {
+                const emailParams = {
+                    to_email: userEmail,
+                    to_name: userName,
+                    from_name: completerName,
+                    task_title: task.title,
+                    task_description: task.description || 'Sin descripción',
+                    task_type: task.type || 'Sin tipo',
+                    task_priority: task.priority || 'media',
+                    task_date: task.dueDate ? new Date(task.dueDate).toLocaleDateString('es-ES') : 'Sin fecha',
+                    task_action: 'completó',
+                    app_url: 'https://todo-app-9b0b6.web.app'
+                };
+
+                promises.push(
+                    this.sendEmail(EMAILJS_CONFIG.templates.newTask, emailParams)
+                );
+            }
+        }
+
+        // Push notification
         if (NOTIFICATION_SETTINGS.pushEvents.taskCompleted) {
-            const completerName = completedBy === 'hades' ? 'Hades' : 'Reiger';
-            
             promises.push(
                 this.showPushNotification(
                     '✅ Tarea completada',
                     {
                         body: `${completerName} completó: "${task.title}"`,
+                        tag: `task-${task.id}`,
+                        requireInteraction: false
+                    }
+                )
+            );
+        }
+
+        const results = await Promise.allSettled(promises);
+        return results;
+    }
+
+    // Notificar cuando se elimina una tarea
+    async notifyTaskDeleted(task, deletedBy) {
+        const promises = [];
+        const deleterName = deletedBy === 'hades' ? 'Hades' : 'Reiger';
+
+        // Notificar a AMBOS usuarios (excepto al que eliminó)
+        const usersToNotify = ['hades', 'reiger'].filter(user => user !== deletedBy);
+
+        for (const userId of usersToNotify) {
+            const userEmail = USER_EMAILS[userId];
+            const userName = userId === 'hades' ? 'Hades' : 'Reiger';
+
+            // Email notification
+            if (NOTIFICATION_SETTINGS.emailEvents.taskDeleted) {
+                const emailParams = {
+                    to_email: userEmail,
+                    to_name: userName,
+                    from_name: deleterName,
+                    task_title: task.title,
+                    task_description: task.description || 'Sin descripción',
+                    task_type: task.type || 'Sin tipo',
+                    task_priority: task.priority || 'media',
+                    task_date: task.dueDate ? new Date(task.dueDate).toLocaleDateString('es-ES') : 'Sin fecha',
+                    task_action: 'eliminó',
+                    app_url: 'https://todo-app-9b0b6.web.app'
+                };
+
+                promises.push(
+                    this.sendEmail(EMAILJS_CONFIG.templates.newTask, emailParams)
+                );
+            }
+        }
+
+        // Push notification
+        if (NOTIFICATION_SETTINGS.pushEvents.taskDeleted) {
+            promises.push(
+                this.showPushNotification(
+                    '🗑️ Tarea eliminada',
+                    {
+                        body: `${deleterName} eliminó: "${task.title}"`,
                         tag: `task-${task.id}`,
                         requireInteraction: false
                     }

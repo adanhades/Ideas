@@ -39,19 +39,17 @@ export const NOTIFICATION_SETTINGS = {
     
     // Eventos que disparan notificaciones por email
     emailEvents: {
-        taskCreated: true,      // Cuando se crea una tarea asignada a ti
-        taskAssigned: true,     // Cuando te asignan una tarea
-        taskUpdated: false,     // Cuando actualizan una tarea tuya
-        taskCompleted: false,   // Cuando completan una tarea tuya
-        taskDeleted: false      // Cuando eliminan una tarea tuya
+        taskCreated: true,      // Cuando se crea una tarea
+        taskUpdated: true,      // Cuando actualizan una tarea
+        taskCompleted: true,    // Cuando completan una tarea
+        taskDeleted: true       // Cuando eliminan una tarea
     },
     
     // Eventos que disparan notificaciones push
     pushEvents: {
         taskCreated: true,
-        taskAssigned: true,
         taskUpdated: true,
         taskCompleted: true,
-        taskDeleted: false
+        taskDeleted: true
     }
 };

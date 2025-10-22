@@ -24,24 +24,25 @@
 3. Usa esta plantilla:
 
 ```
-Asunto: Nueva tarea asignada - {{task_title}}
+Asunto: [TODO App] {{from_name}} {{task_action}} una tarea - {{task_title}}
 
 Hola {{to_name}},
 
-Te han asignado una nueva tarea:
+{{from_name}} {{task_action}} una tarea en el proyecto:
 
 📋 Tarea: {{task_title}}
 📝 Descripción: {{task_description}}
 🏷️ Tipo: {{task_type}}
 ⏰ Prioridad: {{task_priority}}
-👤 Asignada por: {{from_name}}
+👤 Acción realizada por: {{from_name}}
+⚡ Acción: {{task_action}}
 
 📅 Fecha: {{task_date}}
 
-Revisa tus tareas en: https://todo-app-9b0b6.web.app
+Revisa el proyecto completo en: https://todo-app-9b0b6.web.app
 
 ---
-TODO App - Sistema de gestión de tareas
+TODO App - Sistema colaborativo de gestión de tareas
 ```
 
 4. Guarda la plantilla
