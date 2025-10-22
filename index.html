@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TODO List - Organizador de Tareas</title>
+    <link rel="stylesheet" href="styles.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Pantalla de Llave de Acceso -->
+    <div id="accessKeyScreen" class="access-key-screen">
+        <div class="access-key-container">
+            <div class="lock-icon">
+                <i class="fas fa-lock"></i>
+            </div>
+            <h1 class="access-key-title">Acceso Restringido</h1>
+            <p class="access-key-subtitle">Ingresa la llave de acceso para continuar</p>
+            
+            <form id="accessKeyForm" class="access-key-form">
+                <input 
+                    type="password" 
+                    id="accessKeyInput" 
+                    placeholder="Llave de acceso" 
+                    maxlength="9"
+                    autocomplete="off"
+                    required
+                >
+                <button type="submit" class="btn-access">
+                    <i class="fas fa-unlock"></i> Acceder
+                </button>
+            </form>
+            
+            <div id="accessKeyError" class="access-key-error" style="display: none;">
+                <i class="fas fa-exclamation-circle"></i> Llave incorrecta
+            </div>
+        </div>
+    </div>
+
+    <!-- Pantalla de Login -->
+    <div id="loginScreen" class="login-screen" style="display: none;">
+        <div class="login-container">
+            <h1 class="login-title">
+                <i class="fas fa-tasks"></i> TODO List
+            </h1>
+            <p class="login-subtitle">Selecciona tu perfil</p>
+            
+            <div class="profile-selection">
+                <div class="profile-card" data-user="hades">
+                    <div class="profile-avatar">
+                        <img src="hades.jpg" alt="Hades">
+                    </div>
+                    <h3 class="profile-name">Hades</h3>
+                    <p class="profile-description">Señor del Inframundo</p>
+                    <button class="btn-select-profile">
+                        <i class="fas fa-sign-in-alt"></i> Entrar
+                    </button>
+                </div>
+                
+                <div class="profile-card" data-user="reiger">
+                    <div class="profile-avatar">
+                        <img src="reiger.jpg" alt="Reiger">
+                    </div>
+                    <h3 class="profile-name">Reiger</h3>
+                    <p class="profile-description">Guerrero del Espacio</p>
+                    <button class="btn-select-profile">
+                        <i class="fas fa-sign-in-alt"></i> Entrar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Aplicación Principal -->
+    <div class="container" id="appContainer" style="display: none;">
+        <header>
+            <div class="header-content">
+                <div class="header-left">
+                    <h1><i class="fas fa-tasks"></i> TODO List</h1>
+                    <p>Organiza tus tareas por tipo</p>
+                </div>
+                <div class="header-right">
+                    <div class="user-info">
+                        <img id="currentUserAvatar" src="" alt="User" class="user-avatar-small">
+                        <span id="currentUserName" class="user-name"></span>
+                    </div>
+                    <button id="logoutBtn" class="btn-logout" title="Cerrar sesión">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <main>
+            <!-- Botones de acción principal -->
+            <section class="action-buttons-section">
+                <div class="action-buttons">
+                    <button id="addTaskBtn" class="btn-primary">
+                        <i class="fas fa-plus"></i> Nueva Tarea
+                    </button>
+                    <button id="manageTypesBtn" class="btn-secondary">
+                        <i class="fas fa-cog"></i> Gestionar Tipos
+                    </button>
+                </div>
+                <button id="themeToggle" class="theme-toggle" title="Cambiar tema">
+                    <i class="fas fa-moon"></i>
+                </button>
+            </section>
+
+            <!-- Toggle de vista -->
+            <section class="view-toggle">
+                <button class="view-btn active" id="cardViewBtn">
+                    <i class="fas fa-th-large"></i> Vista Tarjetas
+                </button>
+                <button class="view-btn" id="tableViewBtn">
+                    <i class="fas fa-table"></i> Vista Tabla
+                </button>
+            </section>
+
+            <!-- Filtros y estadísticas -->
+            <section class="filters-section">
+                <div class="filters-container">
+                    <div class="filter-group">
+                        <label for="filterType">Filtrar por tipo:</label>
+                        <select id="filterType">
+                            <option value="">Todos los tipos</option>
+                            <option value="personal">Personal</option>
+                            <option value="trabajo">Trabajo</option>
+                            <option value="estudio">Estudio</option>
+                            <option value="hogar">Hogar</option>
+                            <option value="compras">Compras</option>
+                            <option value="salud">Salud</option>
+                            <option value="otros">Otros</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label for="filterStatus">Filtrar por estado:</label>
+                        <select id="filterStatus">
+                            <option value="">Todas</option>
+                            <option value="pendiente">Pendientes</option>
+                            <option value="completada">Completadas</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label for="filterPriority">Filtrar por prioridad:</label>
+                        <select id="filterPriority">
+                            <option value="">Todas las prioridades</option>
+                            <option value="alta">Alta</option>
+                            <option value="media">Media</option>
+                            <option value="baja">Baja</option>
+                        </select>
+                    </div>
+                    
+                    <div class="filter-group">
+                        <label for="filterUser">Filtrar por usuario:</label>
+                        <select id="filterUser">
+                            <option value="">Todos los usuarios</option>
+                        </select>
+                    </div>
+                    
+                    <button id="clearFilters" class="clear-btn">
+                        <i class="fas fa-filter"></i> Limpiar Filtros
+                    </button>
+                </div>
+                
+                <div class="stats-container">
+                    <div class="stat-item">
+                        <span class="stat-number" id="totalTasks">0</span>
+                        <span class="stat-label">Total</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number" id="pendingTasks">0</span>
+                        <span class="stat-label">Pendientes</span>
+                    </div>
+                    <div class="stat-item">
+                        <span class="stat-number" id="completedTasks">0</span>
+                        <span class="stat-label">Completadas</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Lista de tareas por tipo -->
+            <section class="tasks-section">
+                <div id="tasksContainer">
+                    <!-- Las tareas se cargarán dinámicamente aquí -->
+                </div>
+                
+                <div id="emptyState" class="empty-state">
+                    <i class="fas fa-clipboard-list"></i>
+                    <h3>No hay tareas</h3>
+                    <p>Agrega tu primera tarea usando el formulario de arriba</p>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal de confirmación para eliminar -->
+    <div id="deleteModal" class="modal">
+        <div class="modal-content confirm-modal">
+            <h3>Confirmar eliminación</h3>
+            <p>¿Estás seguro de que quieres eliminar esta tarea?</p>
+            <div class="modal-actions">
+                <button id="confirmDelete" class="btn-danger">
+                    <i class="fas fa-trash"></i> Eliminar
+                </button>
+                <button id="cancelDelete" class="btn-secondary">
+                    <i class="fas fa-times"></i> Cancelar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para agregar/editar tareas -->
+    <div id="taskModal" class="modal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3 id="taskModalTitle">Nueva Tarea</h3>
+                <button id="closeTaskModal" class="close-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="taskForm">
+                <div class="form-group">
+                    <label for="taskTitle">Título de la tarea:</label>
+                    <input type="text" id="taskTitle" required placeholder="Ej: Comprar grocerías">
+                </div>
+                
+                <div class="form-group">
+                    <label for="taskDescription">Descripción:</label>
+                    <textarea id="taskDescription" placeholder="Descripción detallada de la tarea"></textarea>
+                </div>
+                
+                <div class="form-group">
+                    <label>Asignado a:</label>
+                    <div class="assigned-user-display">
+                        <img id="assignedUserAvatar" src="" alt="User" class="user-avatar-form">
+                        <span id="assignedUserName"></span>
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="taskType">Tipo de tarea:</label>
+                        <select id="taskType" required>
+                            <option value="">Seleccionar tipo</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="taskPriority">Prioridad:</label>
+                        <select id="taskPriority" required>
+                            <option value="baja">Baja</option>
+                            <option value="media" selected>Media</option>
+                            <option value="alta">Alta</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="taskDueDate">Fecha límite (opcional):</label>
+                    <input type="date" id="taskDueDate">
+                </div>
+                
+                <div id="parentTaskInfo" class="parent-task-info" style="display: none;">
+                    <i class="fas fa-level-up-alt"></i>
+                    <span>Subtarea de: <strong id="parentTaskTitle"></strong></span>
+                </div>
+                
+                <div class="form-actions">
+                    <button type="submit" id="submitBtn">
+                        <i class="fas fa-plus"></i> Agregar Tarea
+                    </button>
+                    <button type="button" id="cancelBtn">
+                        <i class="fas fa-times"></i> Cancelar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para gestionar tipos de tareas -->
+    <div id="typesModal" class="modal">
+        <div class="modal-content modal-medium">
+            <div class="modal-header">
+                <h3>Gestionar Tipos de Tareas</h3>
+                <button id="closeTypesModal" class="close-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="types-section">
+                <h4>Agregar Nuevo Tipo</h4>
+                <form id="newTypeForm">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <input type="text" id="newTypeName" placeholder="Nombre del tipo" required>
+                        </div>
+                        <div class="form-group emoji-selector-container">
+                            <input type="text" id="newTypeIcon" placeholder="Seleccionar emoji" readonly required>
+                            <button type="button" id="emojiPickerBtn" class="emoji-picker-btn">
+                                <i class="fas fa-smile"></i>
+                            </button>
+                            <div id="emojiPicker" class="emoji-picker hidden">
+                                <div class="emoji-grid" id="emojiGrid">
+                                    <!-- Los emojis se cargarán dinámicamente -->
+                                </div>
+                            </div>
+                        </div>
+                        <button type="submit" class="btn-add-type">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="types-list-section">
+                <h4>Tipos Existentes</h4>
+                <div id="typesList" class="types-list">
+                    <!-- Los tipos se cargarán dinámicamente -->
+                </div>
+            </div>
+            
+            <div class="modal-actions">
+                <button id="closeTypesModalBtn" class="btn-secondary">
+                    <i class="fas fa-times"></i> Cerrar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
