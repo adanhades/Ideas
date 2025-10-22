@@ -499,22 +499,39 @@ class TodoApp {
     }
 
     // Agregar nueva tarea
-    addTask(taskData) {
+    async addTask(taskData) {
         const task = {
             id: this.generateId(),
-            ...taskData
+            ...taskData,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
         };
         
-        this.tasks.push(task);
-        this.saveTasks();
-        this.showNotification(
-            taskData.parentId ? 'Subtarea agregada exitosamente' : 'Tarea agregada exitosamente', 
-            'success'
-        );
+        try {
+            // Agregar a array local
+            this.tasks.push(task);
+            
+            // Guardar en Firebase si está disponible
+            if (this.db && this.currentUser) {
+                await setDoc(doc(this.db, 'users', this.currentUser, 'tasks', task.id), task);
+                console.log('✅ Tarea guardada en Firebase:', task.id);
+            }
+            
+            // Backup en localStorage
+            localStorage.setItem('todoTasks', JSON.stringify(this.tasks));
+            
+            this.showNotification(
+                taskData.parentId ? 'Subtarea agregada exitosamente' : 'Tarea agregada exitosamente', 
+                'success'
+            );
+        } catch (error) {
+            console.error('Error al agregar tarea:', error);
+            this.showNotification('Error al guardar la tarea', 'error');
+        }
     }
 
     // Actualizar tarea existente
-    updateTask(id, taskData) {
+    async updateTask(id, taskData) {
         const taskIndex = this.tasks.findIndex(task => task.id === id);
         if (taskIndex !== -1) {
             this.tasks[taskIndex] = {
@@ -522,8 +539,28 @@ class TodoApp {
                 ...taskData,
                 updatedAt: new Date().toISOString()
             };
-            this.saveTasks();
-            this.showNotification('Tarea actualizada exitosamente', 'success');
+            
+            try {
+                // Actualizar en Firebase
+                if (this.db && this.currentUser) {
+                    await updateDoc(
+                        doc(this.db, 'users', this.currentUser, 'tasks', id),
+                        {
+                            ...taskData,
+                            updatedAt: new Date().toISOString()
+                        }
+                    );
+                    console.log('✅ Tarea actualizada en Firebase:', id);
+                }
+                
+                // Backup en localStorage
+                localStorage.setItem('todoTasks', JSON.stringify(this.tasks));
+                
+                this.showNotification('Tarea actualizada exitosamente', 'success');
+            } catch (error) {
+                console.error('Error al actualizar tarea:', error);
+                this.showNotification('Error al actualizar la tarea', 'error');
+            }
         }
     }
 
@@ -534,45 +571,67 @@ class TodoApp {
     }
 
     // Confirmar eliminación
-    confirmDelete() {
+    async confirmDelete() {
         if (this.taskToDelete) {
-            // Eliminar tarea y todas sus subtareas
-            this.deleteTaskAndSubtasks(this.taskToDelete);
-            this.saveTasks();
-            this.renderTasks();
-            this.updateStats();
-            this.hideDeleteModal();
-            this.showNotification('Tarea eliminada exitosamente', 'success');
-            this.taskToDelete = null;
+            try {
+                // Eliminar tarea y todas sus subtareas
+                await this.deleteTaskAndSubtasks(this.taskToDelete);
+                
+                // Backup en localStorage
+                localStorage.setItem('todoTasks', JSON.stringify(this.tasks));
+                
+                this.renderTasks();
+                this.updateStats();
+                this.hideDeleteModal();
+                this.showNotification('Tarea eliminada exitosamente', 'success');
+                this.taskToDelete = null;
+            } catch (error) {
+                console.error('Error al eliminar tarea:', error);
+                this.showNotification('Error al eliminar la tarea', 'error');
+            }
         }
     }
 
     // Eliminar tarea y subtareas recursivamente
-    deleteTaskAndSubtasks(taskId) {
+    async deleteTaskAndSubtasks(taskId) {
         // Encontrar y eliminar todas las subtareas
         const subtasks = this.tasks.filter(task => task.parentId === taskId);
-        subtasks.forEach(subtask => {
-            this.deleteTaskAndSubtasks(subtask.id);
-        });
+        for (const subtask of subtasks) {
+            await this.deleteTaskAndSubtasks(subtask.id);
+        }
         
-        // Eliminar la tarea principal
+        // Eliminar de Firebase
+        if (this.db && this.currentUser) {
+            try {
+                await deleteDoc(doc(this.db, 'users', this.currentUser, 'tasks', taskId));
+                console.log('✅ Tarea eliminada de Firebase:', taskId);
+            } catch (error) {
+                console.error('Error al eliminar de Firebase:', error);
+            }
+        }
+        
+        // Eliminar del array local
         this.tasks = this.tasks.filter(task => task.id !== taskId);
     }
 
     // Alternar estado de completado
-    toggleComplete(id) {
+    async toggleComplete(id) {
         const task = this.tasks.find(task => task.id === id);
         if (task) {
             const newStatus = task.status === 'completada' ? 'pendiente' : 'completada';
-            task.status = newStatus;
-            task.completedAt = newStatus === 'completada' ? new Date().toISOString() : null;
+            const completedAt = newStatus === 'completada' ? new Date().toISOString() : null;
+            
+            // Actualizar tarea
+            await this.updateTask(id, { 
+                status: newStatus, 
+                completedAt 
+            });
             
             // Si es una tarea padre y se marca como completada, marcar subtareas
             if (newStatus === 'completada') {
-                this.markSubtasksComplete(id, true);
+                await this.markSubtasksComplete(id, true);
             }
             
-            this.saveTasks();
             this.renderTasks();
             this.updateStats();
             this.showNotification(`Tarea marcada como ${newStatus}`, 'success');
@@ -1313,76 +1372,81 @@ class TodoApp {
         }
 
         try {
-            const tasksRef = doc(this.db, 'users', this.currentUser, 'data', 'tasks');
-            const tasksDoc = await getDoc(tasksRef);
+            // Cargar todas las tareas de la colección
+            const tasksRef = collection(this.db, 'users', this.currentUser, 'tasks');
+            const querySnapshot = await getDocs(tasksRef);
             
-            if (tasksDoc.exists()) {
-                const data = tasksDoc.data();
-                this.tasks = data.tasks || [];
-                localStorage.setItem('todoTasks', JSON.stringify(this.tasks));
-                this.renderTasks();
-                console.log('✅ Tareas cargadas desde Firebase');
-            } else {
-                console.log('📝 No hay tareas en Firebase, usando locales');
-            }
+            this.tasks = [];
+            querySnapshot.forEach((doc) => {
+                this.tasks.push(doc.data());
+            });
+            
+            // Ordenar por fecha de creación
+            this.tasks.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+            
+            localStorage.setItem('todoTasks', JSON.stringify(this.tasks));
+            this.renderTasks();
+            console.log(`✅ ${this.tasks.length} tareas cargadas desde Firebase (modelo plano)`);
         } catch (error) {
             console.error('❌ Error al cargar tareas desde Firebase:', error);
         }
     }
 
-    // Sincronizar tareas en tiempo real
+    // Sincronizar tareas en tiempo real (modelo plano)
     setupRealtimeSync() {
         if (!this.db || !this.currentUser) return;
 
         try {
-            // Sincronizar tareas en tiempo real
-            const tasksRef = doc(this.db, 'users', this.currentUser, 'data', 'tasks');
-            this.unsubscribeTasks = onSnapshot(tasksRef, (doc) => {
-                if (doc.exists()) {
-                    const data = doc.data();
-                    this.tasks = data.tasks || [];
-                    localStorage.setItem('todoTasks', JSON.stringify(this.tasks));
-                    this.renderTasks();
-                    console.log('🔄 Tareas sincronizadas en tiempo real');
-                }
+            // Sincronizar tareas en tiempo real - escuchando la colección completa
+            const tasksRef = collection(this.db, 'users', this.currentUser, 'tasks');
+            const q = query(tasksRef, orderBy('createdAt', 'desc'));
+            
+            this.unsubscribeTasks = onSnapshot(q, (snapshot) => {
+                this.tasks = [];
+                snapshot.forEach((doc) => {
+                    this.tasks.push(doc.data());
+                });
+                
+                localStorage.setItem('todoTasks', JSON.stringify(this.tasks));
+                this.renderTasks();
+                this.updateStats();
+                console.log(`🔄 ${this.tasks.length} tareas sincronizadas en tiempo real`);
             });
 
-            // Sincronizar tipos de tareas en tiempo real
-            const typesRef = doc(this.db, 'users', this.currentUser, 'data', 'taskTypes');
-            this.unsubscribeTypes = onSnapshot(typesRef, (doc) => {
-                if (doc.exists()) {
+            // Sincronizar tipos de tareas en tiempo real - colección de tipos
+            const typesRef = collection(this.db, 'users', this.currentUser, 'taskTypes');
+            this.unsubscribeTypes = onSnapshot(typesRef, (snapshot) => {
+                this.taskTypes = [];
+                snapshot.forEach((doc) => {
                     const data = doc.data();
-                    this.taskTypes = data.types || this.getDefaultTaskTypes();
-                    localStorage.setItem('todoTaskTypes', JSON.stringify(this.taskTypes));
-                    this.renderTaskTypes();
-                    this.renderTasks(); // Re-renderizar tareas por si cambiaron los colores
-                    console.log('🔄 Tipos de tareas sincronizados en tiempo real');
+                    // Normalizar: convertir 'emoji' a 'icon' para compatibilidad con el código local
+                    this.taskTypes.push({
+                        ...data,
+                        icon: data.emoji || data.icon || '📌'
+                    });
+                });
+                
+                // Si no hay tipos, usar los por defecto
+                if (this.taskTypes.length === 0) {
+                    this.taskTypes = this.getDefaultTaskTypes();
                 }
+                
+                localStorage.setItem('todoTaskTypes', JSON.stringify(this.taskTypes));
+                this.renderTaskTypes();
+                this.renderTasks(); // Re-renderizar tareas por si cambiaron los colores
+                console.log(`🔄 ${this.taskTypes.length} tipos de tareas sincronizados en tiempo real`);
             });
         } catch (error) {
             console.error('Error al configurar sincronización en tiempo real:', error);
         }
     }
 
-    // Guardar tareas en Firebase y localStorage
+    // NOTA: Este método ya no se usa - cada operación guarda individualmente
+    // Guardar tareas en Firebase y localStorage (DEPRECADO - Modelo plano)
     async saveTasks() {
-        try {
-            // Guardar en localStorage primero (backup local)
-            localStorage.setItem('todoTasks', JSON.stringify(this.tasks));
-            
-            // Guardar en Firebase si está disponible
-            if (this.db && this.currentUser) {
-                const tasksRef = doc(this.db, 'users', this.currentUser, 'data', 'tasks');
-                await setDoc(tasksRef, {
-                    tasks: this.tasks,
-                    lastUpdated: new Date().toISOString()
-                });
-                console.log('✅ Tareas sincronizadas con Firebase');
-            }
-        } catch (error) {
-            console.error('Error al guardar tareas:', error);
-            // No mostrar alert, solo log del error
-        }
+        // Este método se mantiene por compatibilidad pero ya no se usa
+        // Ahora cada tarea se guarda individualmente con addTask/updateTask/deleteTask
+        console.warn('⚠️ saveTasks() está deprecado - usar addTask/updateTask/deleteTask');
     }
 
     loadTaskTypes() {
@@ -1399,18 +1463,31 @@ class TodoApp {
         if (!this.db || !this.currentUser) return;
         
         try {
-            const typesRef = doc(this.db, 'users', this.currentUser, 'data', 'taskTypes');
-            const typesSnap = await getDoc(typesRef);
+            // Cargar tipos desde la colección (modelo plano)
+            const typesRef = collection(this.db, 'users', this.currentUser, 'taskTypes');
+            const querySnapshot = await getDocs(typesRef);
             
-            if (typesSnap.exists()) {
-                const data = typesSnap.data();
-                this.taskTypes = data.types || this.getDefaultTaskTypes();
-                // Guardar en localStorage como backup
-                localStorage.setItem('todoTaskTypes', JSON.stringify(this.taskTypes));
-                console.log('✅ Tipos de tareas cargados desde Firebase');
+            this.taskTypes = [];
+            querySnapshot.forEach((doc) => {
+                const data = doc.data();
+                // Normalizar: convertir 'emoji' a 'icon' para compatibilidad con el código local
+                this.taskTypes.push({
+                    ...data,
+                    icon: data.emoji || data.icon || '📌'
+                });
+            });
+            
+            // Si no hay tipos, usar los por defecto
+            if (this.taskTypes.length === 0) {
+                this.taskTypes = this.getDefaultTaskTypes();
             }
+            
+            // Guardar en localStorage como backup
+            localStorage.setItem('todoTaskTypes', JSON.stringify(this.taskTypes));
+            console.log(`✅ ${this.taskTypes.length} tipos de tareas cargados desde Firebase`);
         } catch (error) {
             console.error('Error al cargar tipos desde Firebase:', error);
+            this.taskTypes = this.getDefaultTaskTypes();
         }
     }
 
@@ -1419,14 +1496,25 @@ class TodoApp {
             // Guardar en localStorage primero (backup)
             localStorage.setItem('todoTaskTypes', JSON.stringify(this.taskTypes));
             
-            // Guardar en Firebase si está disponible
+            // Guardar en Firebase si está disponible (modelo plano)
             if (this.db && this.currentUser) {
-                const typesRef = doc(this.db, 'users', this.currentUser, 'data', 'taskTypes');
-                await setDoc(typesRef, {
-                    types: this.taskTypes,
-                    lastUpdated: new Date().toISOString()
-                });
-                console.log('✅ Tipos guardados en Firebase');
+                // Guardar cada tipo como documento individual
+                const batch = [];
+                for (const type of this.taskTypes) {
+                    const typeRef = doc(this.db, 'users', this.currentUser, 'taskTypes', type.id);
+                    // Normalizar: guardar 'icon' como 'emoji' en Firestore
+                    const typeData = {
+                        id: type.id,
+                        name: type.name,
+                        color: type.color,
+                        emoji: type.icon || type.emoji || '📌',
+                        custom: type.custom,
+                        lastUpdated: new Date().toISOString()
+                    };
+                    batch.push(setDoc(typeRef, typeData));
+                }
+                await Promise.all(batch);
+                console.log(`✅ ${this.taskTypes.length} tipos guardados en Firebase`);
             }
         } catch (error) {
             console.error('Error al guardar tipos:', error);
