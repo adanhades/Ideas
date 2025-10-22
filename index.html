@@ -7,6 +7,9 @@
     <link rel="stylesheet" href="styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     
+    <!-- EmailJS SDK -->
+    <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+    
     <!-- Firebase SDK -->
     <script type="module">
         // Importar Firebase
@@ -135,9 +138,14 @@
                         <i class="fas fa-cog"></i> Gestionar Tipos
                     </button>
                 </div>
-                <button id="themeToggle" class="theme-toggle" title="Cambiar tema">
-                    <i class="fas fa-moon"></i>
-                </button>
+                <div class="theme-and-notifications">
+                    <button id="notificationToggle" class="notification-toggle" title="Configurar notificaciones">
+                        <i class="fas fa-bell"></i>
+                    </button>
+                    <button id="themeToggle" class="theme-toggle" title="Cambiar tema">
+                        <i class="fas fa-moon"></i>
+                    </button>
+                </div>
             </section>
 
             <!-- Toggle de vista -->

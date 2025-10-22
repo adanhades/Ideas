@@ -20,6 +20,9 @@ import {
     onAuthStateChanged 
 } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
 
+// 📬 Importar sistema de notificaciones
+import { NotificationManager } from './notifications.js';
+
 // Clase principal para manejar la aplicación TODO
 class TodoApp {
     constructor() {
@@ -29,6 +32,7 @@ class TodoApp {
         this.auth = window.firebaseAuth; // Referencia a Auth
         this.unsubscribeTasks = null; // Para desuscribirse de listeners de tareas
         this.unsubscribeTypes = null; // Para desuscribirse de listeners de tipos
+        this.notificationManager = new NotificationManager(); // Sistema de notificaciones
         
         // Credenciales de los usuarios (SOLO PARA ESTE SISTEMA CERRADO)
         this.userCredentials = {
@@ -275,6 +279,9 @@ class TodoApp {
 
         // Botón de tema
         document.getElementById('themeToggle').addEventListener('click', () => this.toggleTheme());
+
+        // Botón de notificaciones
+        document.getElementById('notificationToggle').addEventListener('click', () => this.toggleNotifications());
 
         // Botones de vista
         document.getElementById('cardViewBtn').addEventListener('click', () => this.switchView('card'));
@@ -523,6 +530,15 @@ class TodoApp {
             // Backup en localStorage
             localStorage.setItem('todoTasks', JSON.stringify(this.tasks));
             
+            // Enviar notificaciones (email + push)
+            if (this.notificationManager) {
+                await this.notificationManager.notifyTaskCreated(
+                    task,
+                    this.currentUser, // Quién creó la tarea
+                    taskData.assignedTo // A quién está asignada
+                );
+            }
+            
             this.showNotification(
                 taskData.parentId ? 'Subtarea agregada exitosamente' : 'Tarea agregada exitosamente', 
                 'success'
@@ -558,6 +574,23 @@ class TodoApp {
                 
                 // Backup en localStorage
                 localStorage.setItem('todoTasks', JSON.stringify(this.tasks));
+                
+                // Enviar notificaciones si cambió a completado
+                const updatedTask = this.tasks[taskIndex];
+                if (taskData.status === 'completed' && this.notificationManager) {
+                    await this.notificationManager.notifyTaskCompleted(
+                        updatedTask,
+                        this.currentUser,
+                        updatedTask.assignedTo
+                    );
+                } else if (this.notificationManager) {
+                    // Notificar actualización general
+                    await this.notificationManager.notifyTaskUpdated(
+                        updatedTask,
+                        this.currentUser,
+                        updatedTask.assignedTo
+                    );
+                }
                 
                 this.showNotification('Tarea actualizada exitosamente', 'success');
             } catch (error) {
@@ -757,6 +790,50 @@ class TodoApp {
         this.theme = this.theme === 'light' ? 'dark' : 'light';
         this.applyTheme();
         this.saveTheme();
+    }
+
+    // Configurar notificaciones
+    async toggleNotifications() {
+        if (!this.notificationManager) {
+            this.showNotification('Sistema de notificaciones no disponible', 'error');
+            return;
+        }
+
+        const settings = this.notificationManager.getSettings();
+        const btn = document.getElementById('notificationToggle');
+
+        // Si ya están activas, mostrar estado
+        if (settings.pushPermission === 'granted') {
+            this.showNotification(
+                `✅ Notificaciones activas\n\n` +
+                `📧 Email: ${settings.emailJsInitialized ? 'Configurado' : 'No configurado'}\n` +
+                `🔔 Push: Habilitadas`,
+                'success',
+                'Estado de Notificaciones',
+                8000
+            );
+            return;
+        }
+
+        // Solicitar permiso
+        const granted = await this.notificationManager.requestPushPermission();
+        
+        if (granted) {
+            btn.classList.add('active');
+            this.showNotification(
+                '¡Notificaciones push activadas! 🎉\n\nRecibirás notificaciones cuando:\n• Te asignen una tarea\n• Actualicen tus tareas\n• Completen tus tareas',
+                'success',
+                'Notificaciones Activadas',
+                8000
+            );
+        } else {
+            this.showNotification(
+                'Permiso denegado. Puedes habilitarlo desde la configuración del navegador.',
+                'warning',
+                'Notificaciones Bloqueadas',
+                6000
+            );
+        }
     }
 
     // Aplicar tema
