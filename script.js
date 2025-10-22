@@ -184,6 +184,9 @@ class TodoApp {
             // Configurar sincronización en tiempo real
             this.setupRealtimeSync();
             
+            // Configurar listener de notificaciones
+            this.setupNotificationsListener();
+            
             // Renderizar interfaz
             this.renderTaskTypes();
             this.renderUserFilter();
@@ -690,22 +693,50 @@ class TodoApp {
     }
 
     // Eliminar tipo de tarea
-    deleteTaskType(typeId) {
+    async deleteTaskType(typeId) {
         const typeToDelete = this.taskTypes.find(type => type.id === typeId);
         if (!typeToDelete) return;
         
-        const tasksWithType = this.tasks.filter(task => task.type === typeId).length;
-        let message = `¿Estás seguro de que quieres eliminar el tipo "${typeToDelete.name}"?`;
+        // Verificar localmente si hay tareas usando este tipo
+        const tasksWithType = this.tasks.filter(task => task.type === typeId);
         
-        if (tasksWithType > 0) {
-            message += `\n\nActualmente hay ${tasksWithType} tarea(s) con este tipo.`;
+        if (tasksWithType.length > 0) {
+            alert(`❌ No se puede eliminar el tipo "${typeToDelete.name}"\n\nHay ${tasksWithType.length} tarea(s) usando este tipo.\n\nPrimero debes reasignar o eliminar esas tareas.`);
+            return;
         }
         
-        if (confirm(message)) {
-            this.taskTypes = this.taskTypes.filter(type => type.id !== typeId);
-            this.saveTaskTypes();
-            this.renderTaskTypes();
-            this.renderTypesList();
+        // Confirmar eliminación
+        if (!confirm(`¿Estás seguro de que quieres eliminar el tipo "${typeToDelete.name}"?`)) {
+            return;
+        }
+        
+        try {
+            // Si Firebase está disponible, eliminar del servidor
+            if (this.db && this.currentUser) {
+                const typeRef = doc(this.db, 'users', this.currentUser, 'taskTypes', typeId);
+                await deleteDoc(typeRef);
+                
+                console.log(`✅ Tipo "${typeToDelete.name}" eliminado de Firebase`);
+                
+                // La sincronización en tiempo real actualizará la UI automáticamente
+                // Pero también actualizamos localmente por si acaso
+                this.taskTypes = this.taskTypes.filter(type => type.id !== typeId);
+                localStorage.setItem('todoTaskTypes', JSON.stringify(this.taskTypes));
+            } else {
+                // Sin Firebase, eliminar solo localmente
+                this.taskTypes = this.taskTypes.filter(type => type.id !== typeId);
+                localStorage.setItem('todoTaskTypes', JSON.stringify(this.taskTypes));
+                this.renderTaskTypes();
+                this.renderTypesList();
+            }
+            
+            // Nota: Si hay una Cloud Function activa (validateTypeDelete),
+            // esta impedirá la eliminación si hay tareas asociadas y
+            // creará una notificación que aparecerá automáticamente
+            
+        } catch (error) {
+            console.error('Error al eliminar tipo:', error);
+            alert(`❌ Error al eliminar el tipo: ${error.message}`);
         }
     }
 
@@ -1519,6 +1550,89 @@ class TodoApp {
         } catch (error) {
             console.error('Error al guardar tipos:', error);
             // No mostrar alert, solo log del error
+        }
+    }
+
+    // Sistema de Notificaciones
+    showNotification(message, type = 'info', title = null, duration = 5000) {
+        const container = document.getElementById('notificationsContainer');
+        if (!container) return;
+
+        const notification = document.createElement('div');
+        notification.className = `notification ${type}`;
+
+        // Iconos según tipo
+        const icons = {
+            success: 'fa-check-circle',
+            error: 'fa-exclamation-circle',
+            warning: 'fa-exclamation-triangle',
+            info: 'fa-info-circle'
+        };
+
+        notification.innerHTML = `
+            <i class="fas ${icons[type] || icons.info} notification-icon"></i>
+            <div class="notification-content">
+                ${title ? `<div class="notification-title">${title}</div>` : ''}
+                <div class="notification-message">${message}</div>
+            </div>
+            <button class="notification-close" aria-label="Cerrar">
+                <i class="fas fa-times"></i>
+            </button>
+        `;
+
+        // Botón de cerrar
+        const closeBtn = notification.querySelector('.notification-close');
+        closeBtn.addEventListener('click', () => {
+            notification.style.animation = 'slideOutRight 0.3s ease-out';
+            setTimeout(() => notification.remove(), 300);
+        });
+
+        // Agregar al contenedor
+        container.appendChild(notification);
+
+        // Auto-cerrar después de la duración especificada
+        if (duration > 0) {
+            setTimeout(() => {
+                if (notification.parentElement) {
+                    notification.style.animation = 'slideOutRight 0.3s ease-out';
+                    setTimeout(() => notification.remove(), 300);
+                }
+            }, duration);
+        }
+
+        return notification;
+    }
+
+    // Escuchar notificaciones desde Firestore (cuando Cloud Functions esté activa)
+    setupNotificationsListener() {
+        if (!this.db || !this.currentUser) return;
+
+        try {
+            const notificationsRef = collection(this.db, 'users', this.currentUser, 'notifications');
+            const q = query(notificationsRef, where('read', '==', false), orderBy('createdAt', 'desc'));
+
+            this.unsubscribeNotifications = onSnapshot(q, (snapshot) => {
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === 'added') {
+                        const notif = change.doc.data();
+                        
+                        // Mostrar notificación en la UI
+                        this.showNotification(
+                            notif.message,
+                            notif.type === 'type-deletion-blocked' ? 'warning' : 'info',
+                            'Acción bloqueada',
+                            8000 // 8 segundos
+                        );
+
+                        // Marcar como leída
+                        updateDoc(change.doc.ref, { read: true });
+                    }
+                });
+            });
+
+            console.log('✅ Listener de notificaciones activado');
+        } catch (error) {
+            console.error('Error al configurar listener de notificaciones:', error);
         }
     }
 }
