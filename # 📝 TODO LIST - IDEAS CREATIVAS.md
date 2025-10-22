@@ -1,7 +1,7 @@
 # 📝 TODO LIST - IDEAS CREATIVAS
 
 ## 🎮 IDEAS DE JUEGOS
-- [ ] 
+- [ ] Revisar plataforma Godot
 - [ ] 
 - [ ] 
 - [ ] 
