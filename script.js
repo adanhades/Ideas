@@ -1,8 +1,40 @@
+// 🔥 Importar módulos de Firebase
+import { 
+    collection, 
+    doc, 
+    getDoc,
+    setDoc,
+    addDoc,
+    updateDoc,
+    getDocs, 
+    deleteDoc,
+    onSnapshot,
+    query,
+    where,
+    orderBy 
+} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+import { 
+    signInWithEmailAndPassword, 
+    signOut, 
+    onAuthStateChanged 
+} from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
 // Clase principal para manejar la aplicación TODO
 class TodoApp {
     constructor() {
         this.accessKey = 'I2D0E2A5S';
-        this.currentUser = this.loadCurrentUser();
+        this.currentUser = null; // Ahora lo maneja Firebase Auth
+        this.db = window.firestoreDB; // Referencia a Firestore
+        this.auth = window.firebaseAuth; // Referencia a Auth
+        this.unsubscribeTasks = null; // Para desuscribirse de listeners de tareas
+        this.unsubscribeTypes = null; // Para desuscribirse de listeners de tipos
+        
+        // Credenciales de los usuarios (SOLO PARA ESTE SISTEMA CERRADO)
+        this.userCredentials = {
+            hades: { email: 'hades@todo-app.com', password: 'Hades2025!Secure' },
+            reiger: { email: 'reiger@todo-app.com', password: 'Reiger2025!Secure' }
+        };
         this.users = {
             hades: {
                 name: 'Hades',
@@ -110,24 +142,94 @@ class TodoApp {
         this.updateUserDisplay();
     }
 
-    // Login
-    login(userId) {
-        this.currentUser = userId;
-        this.saveCurrentUser(userId);
-        this.showApp();
-        this.bindEvents();
-        this.renderTaskTypes();
-        this.renderUserFilter();
-        this.renderTasks();
-        this.applyTheme();
+    // Login con Firebase Authentication
+    async login(userId) {
+        try {
+            // Obtener credenciales del usuario
+            const credentials = this.userCredentials[userId];
+            if (!credentials) {
+                alert('Usuario no válido');
+                return;
+            }
+            
+            // Autenticar con Firebase
+            const userCredential = await signInWithEmailAndPassword(
+                this.auth, 
+                credentials.email, 
+                credentials.password
+            );
+            
+            // Verificar que el UID coincida (seguridad adicional)
+            if (userCredential.user.uid !== userId) {
+                await signOut(this.auth);
+                alert('Error de autenticación: UID no coincide');
+                return;
+            }
+            
+            // Guardar usuario actual
+            this.currentUser = userId;
+            localStorage.setItem('currentUser', userId);
+            
+            // Mostrar aplicación
+            this.showApp();
+            this.bindEvents();
+            this.applyTheme();
+            
+            // Cargar tipos de tareas desde Firebase primero
+            await this.loadTaskTypesFromFirebase();
+            
+            // Cargar tareas desde Firebase
+            await this.loadTasksFromFirebase();
+            
+            // Configurar sincronización en tiempo real
+            this.setupRealtimeSync();
+            
+            // Renderizar interfaz
+            this.renderTaskTypes();
+            this.renderUserFilter();
+            this.renderTasks();
+            
+            console.log('🔥 Firebase Auth conectado:', userCredential.user.email);
+            console.log('✅ Usuario autenticado:', userId);
+            
+        } catch (error) {
+            console.error('Error en login:', error);
+            alert('Error al iniciar sesión: ' + error.message);
+        }
     }
 
-    // Logout
-    logout() {
+    // Logout con Firebase Authentication
+    async logout() {
         if (confirm('¿Estás seguro de que quieres cerrar sesión?')) {
-            this.currentUser = null;
-            localStorage.removeItem('currentUser');
-            this.showLoginScreen();
+            try {
+                // Detener sincronización en tiempo real de tareas
+                if (this.unsubscribeTasks) {
+                    this.unsubscribeTasks();
+                    this.unsubscribeTasks = null;
+                }
+                
+                // Detener sincronización en tiempo real de tipos
+                if (this.unsubscribeTypes) {
+                    this.unsubscribeTypes();
+                    this.unsubscribeTypes = null;
+                }
+                
+                // Cerrar sesión en Firebase
+                await signOut(this.auth);
+                
+                // Limpiar estado local
+                this.currentUser = null;
+                localStorage.removeItem('currentUser');
+                
+                // Mostrar pantalla de login
+                this.showLoginScreen();
+                
+                console.log('👋 Sesión cerrada correctamente');
+                
+            } catch (error) {
+                console.error('Error al cerrar sesión:', error);
+                alert('Error al cerrar sesión: ' + error.message);
+            }
         }
     }
 
@@ -1192,7 +1294,7 @@ class TodoApp {
         ];
     }
 
-    // Almacenamiento local
+    // Cargar tareas desde localStorage (Firebase se carga después del login)
     loadTasks() {
         try {
             const tasks = localStorage.getItem('todoTasks');
@@ -1203,12 +1305,83 @@ class TodoApp {
         }
     }
 
-    saveTasks() {
+    // Cargar tareas desde Firebase
+    async loadTasksFromFirebase() {
+        if (!this.db || !this.currentUser) {
+            console.log('⚠️ Firebase no disponible o usuario no logueado');
+            return;
+        }
+
         try {
+            const tasksRef = doc(this.db, 'users', this.currentUser, 'data', 'tasks');
+            const tasksDoc = await getDoc(tasksRef);
+            
+            if (tasksDoc.exists()) {
+                const data = tasksDoc.data();
+                this.tasks = data.tasks || [];
+                localStorage.setItem('todoTasks', JSON.stringify(this.tasks));
+                this.renderTasks();
+                console.log('✅ Tareas cargadas desde Firebase');
+            } else {
+                console.log('📝 No hay tareas en Firebase, usando locales');
+            }
+        } catch (error) {
+            console.error('❌ Error al cargar tareas desde Firebase:', error);
+        }
+    }
+
+    // Sincronizar tareas en tiempo real
+    setupRealtimeSync() {
+        if (!this.db || !this.currentUser) return;
+
+        try {
+            // Sincronizar tareas en tiempo real
+            const tasksRef = doc(this.db, 'users', this.currentUser, 'data', 'tasks');
+            this.unsubscribeTasks = onSnapshot(tasksRef, (doc) => {
+                if (doc.exists()) {
+                    const data = doc.data();
+                    this.tasks = data.tasks || [];
+                    localStorage.setItem('todoTasks', JSON.stringify(this.tasks));
+                    this.renderTasks();
+                    console.log('🔄 Tareas sincronizadas en tiempo real');
+                }
+            });
+
+            // Sincronizar tipos de tareas en tiempo real
+            const typesRef = doc(this.db, 'users', this.currentUser, 'data', 'taskTypes');
+            this.unsubscribeTypes = onSnapshot(typesRef, (doc) => {
+                if (doc.exists()) {
+                    const data = doc.data();
+                    this.taskTypes = data.types || this.getDefaultTaskTypes();
+                    localStorage.setItem('todoTaskTypes', JSON.stringify(this.taskTypes));
+                    this.renderTaskTypes();
+                    this.renderTasks(); // Re-renderizar tareas por si cambiaron los colores
+                    console.log('🔄 Tipos de tareas sincronizados en tiempo real');
+                }
+            });
+        } catch (error) {
+            console.error('Error al configurar sincronización en tiempo real:', error);
+        }
+    }
+
+    // Guardar tareas en Firebase y localStorage
+    async saveTasks() {
+        try {
+            // Guardar en localStorage primero (backup local)
             localStorage.setItem('todoTasks', JSON.stringify(this.tasks));
+            
+            // Guardar en Firebase si está disponible
+            if (this.db && this.currentUser) {
+                const tasksRef = doc(this.db, 'users', this.currentUser, 'data', 'tasks');
+                await setDoc(tasksRef, {
+                    tasks: this.tasks,
+                    lastUpdated: new Date().toISOString()
+                });
+                console.log('✅ Tareas sincronizadas con Firebase');
+            }
         } catch (error) {
             console.error('Error al guardar tareas:', error);
-            alert('Error al guardar las tareas.');
+            // No mostrar alert, solo log del error
         }
     }
 
@@ -1222,12 +1395,42 @@ class TodoApp {
         }
     }
 
-    saveTaskTypes() {
+    async loadTaskTypesFromFirebase() {
+        if (!this.db || !this.currentUser) return;
+        
         try {
+            const typesRef = doc(this.db, 'users', this.currentUser, 'data', 'taskTypes');
+            const typesSnap = await getDoc(typesRef);
+            
+            if (typesSnap.exists()) {
+                const data = typesSnap.data();
+                this.taskTypes = data.types || this.getDefaultTaskTypes();
+                // Guardar en localStorage como backup
+                localStorage.setItem('todoTaskTypes', JSON.stringify(this.taskTypes));
+                console.log('✅ Tipos de tareas cargados desde Firebase');
+            }
+        } catch (error) {
+            console.error('Error al cargar tipos desde Firebase:', error);
+        }
+    }
+
+    async saveTaskTypes() {
+        try {
+            // Guardar en localStorage primero (backup)
             localStorage.setItem('todoTaskTypes', JSON.stringify(this.taskTypes));
+            
+            // Guardar en Firebase si está disponible
+            if (this.db && this.currentUser) {
+                const typesRef = doc(this.db, 'users', this.currentUser, 'data', 'taskTypes');
+                await setDoc(typesRef, {
+                    types: this.taskTypes,
+                    lastUpdated: new Date().toISOString()
+                });
+                console.log('✅ Tipos guardados en Firebase');
+            }
         } catch (error) {
             console.error('Error al guardar tipos:', error);
-            alert('Error al guardar los tipos de tareas.');
+            // No mostrar alert, solo log del error
         }
     }
 }

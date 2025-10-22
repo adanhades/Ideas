@@ -1,0 +1,25 @@
+# Firebase
+firebase-admin-setup/serviceAccountKey.json
+firebase-admin-setup/node_modules/
+firebase-admin-setup/package-lock.json
+
+# Node modules
+node_modules/
+package-lock.json
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema operativo
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Temporales
+*.tmp

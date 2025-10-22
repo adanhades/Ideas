@@ -6,6 +6,36 @@
     <title>TODO List - Organizador de Tareas</title>
     <link rel="stylesheet" href="styles.css">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <!-- Firebase SDK -->
+    <script type="module">
+        // Importar Firebase
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+        import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        
+        // Configuración de Firebase
+        const firebaseConfig = {
+            apiKey: "AIzaSyDEQYb0p4G3VLNNMorbCloQabX21HUaGXM",
+            authDomain: "todo-app-9b0b6.firebaseapp.com",
+            projectId: "todo-app-9b0b6",
+            storageBucket: "todo-app-9b0b6.firebasestorage.app",
+            messagingSenderId: "1077361723987",
+            appId: "1:1077361723987:web:cf4571c4f7980b9a0c54a6"
+        };
+        
+        // Inicializar Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+        
+        // Hacer disponible globalmente
+        window.firebaseApp = app;
+        window.firestoreDB = db;
+        window.firebaseAuth = auth;
+        
+        console.log('🔥 Firebase inicializado correctamente');
+    </script>
 </head>
 <body>
     <!-- Pantalla de Llave de Acceso -->
@@ -330,6 +360,7 @@
         </div>
     </div>
 
-    <script src="script.js"></script>
+    <!-- Cargar script principal después de Firebase -->
+    <script type="module" src="script.js"></script>
 </body>
 </html>
