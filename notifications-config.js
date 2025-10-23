@@ -4,28 +4,28 @@
 
 export const EMAILJS_CONFIG = {
     // Public Key de tu cuenta EmailJS
-    publicKey: 'TU_PUBLIC_KEY_AQUI', // Ejemplo: 'user_1A2B3C4D5E6F'
+    publicKey: 'vP3GTwn1AyQPt8GTR',
     
     // Service ID (el servicio de email que configuraste)
-    serviceId: 'TU_SERVICE_ID_AQUI', // Ejemplo: 'service_gmail'
+    serviceId: 'service_nbynjjq',
     
     // Template IDs para diferentes tipos de notificaciones
     templates: {
         // Plantilla para nueva tarea asignada
-        newTask: 'TU_TEMPLATE_ID_AQUI', // Ejemplo: 'template_newtask'
+        newTask: 'template_h36cb8h',
         
-        // Plantilla para tarea actualizada
-        taskUpdated: 'template_taskupdated',
+        // Plantilla para tarea actualizada (usando la misma por ahora)
+        taskUpdated: 'template_h36cb8h',
         
-        // Plantilla para recordatorio
-        reminder: 'template_reminder'
+        // Plantilla para recordatorio (usando la misma por ahora)
+        reminder: 'template_h36cb8h'
     }
 };
 
 // 📧 Emails de los usuarios
 // Estos emails recibirán las notificaciones
 export const USER_EMAILS = {
-    hades: 'hades@todo-app.com', // Reemplaza con email real
+    hades: 'adan.hades@gmail.com', // Reemplaza con email real
     reiger: 'reiger@todo-app.com' // Reemplaza con email real
 };
 
