@@ -1,0 +1,46 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function para verificar usuarios autorizados
+    function isSignedInAndAuthorized() {
+      return request.auth != null && 
+             (request.auth.uid == 'hades' || request.auth.uid == 'reiger');
+    }
+
+    // TAREAS: Ambos usuarios pueden ver y modificar TODAS las tareas
+    match /users/{userId}/tasks/{taskId} {
+      // Leer: Cualquier usuario autorizado puede ver todas las tareas
+      allow read: if isSignedInAndAuthorized();
+
+      // Crear: Cualquier usuario autorizado puede crear tareas en cualquier colección
+      allow create: if isSignedInAndAuthorized() &&
+                       request.resource.data.title is string && 
+                       request.resource.data.title.size() > 0;
+
+      // Actualizar: Cualquier usuario autorizado puede actualizar cualquier tarea
+      allow update: if isSignedInAndAuthorized();
+      
+      // Eliminar: Cualquier usuario autorizado puede eliminar cualquier tarea
+      allow delete: if isSignedInAndAuthorized();
+    }
+
+    // TIPOS DE TAREAS: Ambos usuarios pueden ver y modificar todos los tipos
+    match /users/{userId}/taskTypes/{typeId} {
+      allow read: if isSignedInAndAuthorized();
+      allow create: if isSignedInAndAuthorized();
+      allow update: if isSignedInAndAuthorized();
+      allow delete: if isSignedInAndAuthorized();
+    }
+
+    // NOTIFICACIONES: Cada usuario solo ve sus propias notificaciones
+    match /users/{userId}/notifications/{notificationId} {
+      allow read, write: if isSignedInAndAuthorized() && request.auth.uid == userId;
+    }
+
+    // Denegar todo lo demás por defecto
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

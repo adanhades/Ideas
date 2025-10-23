@@ -1491,21 +1491,25 @@ class TodoApp {
         }
 
         try {
-            // Cargar todas las tareas de la colección
-            const tasksRef = collection(this.db, 'users', this.currentUser, 'tasks');
-            const querySnapshot = await getDocs(tasksRef);
-            
+            // Cargar tareas de AMBOS usuarios (hades y reiger)
+            const users = ['hades', 'reiger'];
             this.tasks = [];
-            querySnapshot.forEach((doc) => {
-                this.tasks.push(doc.data());
-            });
+            
+            for (const userId of users) {
+                const tasksRef = collection(this.db, 'users', userId, 'tasks');
+                const querySnapshot = await getDocs(tasksRef);
+                
+                querySnapshot.forEach((doc) => {
+                    this.tasks.push(doc.data());
+                });
+            }
             
             // Ordenar por fecha de creación
             this.tasks.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
             
             localStorage.setItem('todoTasks', JSON.stringify(this.tasks));
             this.renderTasks();
-            console.log(`✅ ${this.tasks.length} tareas cargadas desde Firebase (modelo plano)`);
+            console.log(`✅ ${this.tasks.length} tareas cargadas desde Firebase (ambos usuarios)`);
         } catch (error) {
             console.error('❌ Error al cargar tareas desde Firebase:', error);
         }
@@ -1516,21 +1520,49 @@ class TodoApp {
         if (!this.db || !this.currentUser) return;
 
         try {
-            // Sincronizar tareas en tiempo real - escuchando la colección completa
-            const tasksRef = collection(this.db, 'users', this.currentUser, 'tasks');
-            const q = query(tasksRef, orderBy('createdAt', 'desc'));
+            // Sincronizar tareas de AMBOS usuarios en tiempo real
+            const users = ['hades', 'reiger'];
+            const unsubscribers = [];
             
-            this.unsubscribeTasks = onSnapshot(q, (snapshot) => {
-                this.tasks = [];
-                snapshot.forEach((doc) => {
-                    this.tasks.push(doc.data());
-                });
-                
+            // Listener combinado para ambos usuarios
+            const updateTasks = () => {
+                // Re-renderizar con los datos actuales
                 localStorage.setItem('todoTasks', JSON.stringify(this.tasks));
                 this.renderTasks();
                 this.updateStats();
-                console.log(`🔄 ${this.tasks.length} tareas sincronizadas en tiempo real`);
+            };
+            
+            // Escuchar tareas de cada usuario
+            users.forEach(userId => {
+                const tasksRef = collection(this.db, 'users', userId, 'tasks');
+                const q = query(tasksRef, orderBy('createdAt', 'desc'));
+                
+                const unsubscribe = onSnapshot(q, (snapshot) => {
+                    // Filtrar tareas del usuario actual de la lista
+                    this.tasks = this.tasks.filter(t => !t.id || snapshot.docs.every(doc => doc.id !== t.id));
+                    
+                    // Agregar/actualizar tareas de este usuario
+                    snapshot.forEach((doc) => {
+                        const existingIndex = this.tasks.findIndex(t => t.id === doc.data().id);
+                        if (existingIndex >= 0) {
+                            this.tasks[existingIndex] = doc.data();
+                        } else {
+                            this.tasks.push(doc.data());
+                        }
+                    });
+                    
+                    // Ordenar por fecha de creación
+                    this.tasks.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+                    
+                    updateTasks();
+                    console.log(`🔄 Tareas sincronizadas en tiempo real (${userId})`);
+                });
+                
+                unsubscribers.push(unsubscribe);
             });
+            
+            // Guardar función para desuscribirse de todos
+            this.unsubscribeTasks = () => unsubscribers.forEach(unsub => unsub());
 
             // Sincronizar tipos de tareas en tiempo real - colección de tipos
             const typesRef = collection(this.db, 'users', this.currentUser, 'taskTypes');
