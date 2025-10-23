@@ -25,8 +25,8 @@ export const EMAILJS_CONFIG = {
 // 📧 Emails de los usuarios
 // Estos emails recibirán las notificaciones
 export const USER_EMAILS = {
-    hades: 'adan.hades@gmail.com', // Reemplaza con email real
-    reiger: 'reiger@todo-app.com' // Reemplaza con email real
+    hades: 'adan.hades@gmail.com',
+    reiger: 'enrique.fernandez.jorquera@gmail.com'
 };
 
 // ⚙️ Configuración de notificaciones
